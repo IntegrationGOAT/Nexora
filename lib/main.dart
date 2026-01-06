@@ -7,30 +7,30 @@ import 'screens/home/home_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
+  
   // Initialize storage
   final storage = StorageService();
   await storage.init();
-
+  
   // Initialize streak service
   final streakService = StreakService(storage);
-
+  
   // Set preferred orientations (portrait only)
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
-
+  
   runApp(MyApp(
     storage: storage,
     streakService: streakService,
   ));
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   final StorageService storage;
   final StreakService streakService;
-
+  
   const MyApp({
     super.key,
     required this.storage,
@@ -38,17 +38,59 @@ class MyApp extends StatelessWidget {
   });
 
   @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  ThemeMode _themeMode = ThemeMode.dark; // Start with dark mode
+
+  void toggleTheme() {
+    setState(() {
+      _themeMode = _themeMode == ThemeMode.dark 
+          ? ThemeMode.light 
+          : ThemeMode.dark;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'StudyBuddy: Smash Mode',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.dark, // Default to dark mode
-      home: HomeScreen(
-        storage: storage,
-        streakService: streakService,
+    return ThemeProvider(
+      themeMode: _themeMode,
+      onThemeToggle: toggleTheme,
+      child: MaterialApp(
+        title: 'StudyBuddy',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.lightTheme,
+        darkTheme: AppTheme.darkTheme,
+        themeMode: _themeMode,
+        home: HomeScreen(
+          storage: widget.storage,
+          streakService: widget.streakService,
+        ),
       ),
     );
   }
 }
+
+// Theme provider to make theme accessible throughout the app
+class ThemeProvider extends InheritedWidget {
+  final ThemeMode themeMode;
+  final VoidCallback onThemeToggle;
+
+  const ThemeProvider({
+    super.key,
+    required this.themeMode,
+    required this.onThemeToggle,
+    required super.child,
+  });
+
+  static ThemeProvider? of(BuildContext context) {
+    return context.dependOnInheritedWidgetOfExactType<ThemeProvider>();
+  }
+
+  @override
+  bool updateShouldNotify(ThemeProvider oldWidget) {
+    return themeMode != oldWidget.themeMode;
+  }
+}
+

@@ -4,6 +4,7 @@ import '../../core/services/storage_service.dart';
 import '../../core/services/streak_service.dart';
 import '../../core/services/haptic_service.dart';
 import '../../widgets/glass_card.dart';
+import '../analytics/analytics_screen.dart';
 
 class SessionCompleteScreen extends StatefulWidget {
   final StorageService storage;
@@ -68,52 +69,81 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen>
     final isCompleted = widget.session.result == 'completed';
 
     return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Celebration animation
-              ScaleTransition(
-                scale: Tween<double>(begin: 0.0, end: 1.0).animate(
-                  CurvedAnimation(
-                    parent: _celebrationController,
-                    curve: Curves.elasticOut,
+      body: Container(
+        decoration: isCompleted
+            ? BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    const Color(0xFF10B981).withOpacity(0.2),
+                    const Color(0xFF059669).withOpacity(0.1),
+                  ],
+                ),
+              )
+            : null,
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Celebration animation
+                ScaleTransition(
+                  scale: Tween<double>(begin: 0.0, end: 1.0).animate(
+                    CurvedAnimation(
+                      parent: _celebrationController,
+                      curve: Curves.elasticOut,
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        isCompleted ? '🎉' : '⚠️',
+                        style: const TextStyle(fontSize: 120),
+                      ),
+                      if (isCompleted) ...[
+                        const SizedBox(height: 16),
+                        Text(
+                          'HURRAY!',
+                          style: Theme.of(context).textTheme.displayLarge?.copyWith(
+                            color: Colors.green,
+                            fontWeight: FontWeight.w900,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ],
                   ),
                 ),
-                child: Text(
-                  isCompleted ? '🎯' : '⚠️',
-                  style: const TextStyle(fontSize: 120),
+
+                const SizedBox(height: 24),
+
+                // Title
+                Text(
+                  isCompleted ? 'SESSION COMPLETE!' : 'Session Ended Early',
+                  style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
-              ),
 
-              const SizedBox(height: 24),
+                const SizedBox(height: 32),
 
-              // Title
-              Text(
-                isCompleted ? 'SESSION COMPLETE!' : 'Session Ended Early',
-                style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-                textAlign: TextAlign.center,
-              ),
+                // Stats
+                _buildStatsCard(),
 
-              const SizedBox(height: 32),
+                const SizedBox(height: 24),
 
-              // Stats
-              _buildStatsCard(),
+                // Honesty check
+                if (isCompleted) _buildHonestyCheck(),
 
-              const SizedBox(height: 24),
+                const SizedBox(height: 32),
 
-              // Honesty check
-              if (isCompleted) _buildHonestyCheck(),
-
-              const SizedBox(height: 32),
-
-              // Buttons
-              _buildActionButtons(),
-            ],
+                // Buttons
+                _buildActionButtons(),
+              ],
+            ),
           ),
         ),
       ),
@@ -255,22 +285,28 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen>
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               icon,
-              size: 20,
+              size: 18,
               color: isSelected
                   ? (honest ? Colors.green : Colors.orange)
                   : Colors.grey,
             ),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                color: isSelected
-                    ? (honest ? Colors.green : Colors.orange)
-                    : null,
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                label,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  fontSize: 13,
+                  color: isSelected
+                      ? (honest ? Colors.green : Colors.orange)
+                      : null,
+                ),
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
               ),
             ),
           ],
@@ -282,20 +318,51 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen>
   Widget _buildActionButtons() {
     return Column(
       children: [
+        // Home Button
         SizedBox(
           width: double.infinity,
-          child: ElevatedButton(
-            onPressed: () => Navigator.of(context).popUntil((route) => route.isFirst),
-            child: const Text('BACK TO HOME'),
+          child: ElevatedButton.icon(
+            onPressed: () {
+              Navigator.of(context).popUntil((route) => route.isFirst);
+            },
+            icon: const Icon(Icons.home_rounded),
+            label: const Text('BACK TO HOME'),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              backgroundColor: const Color(0xFF7C3AED),
+            ),
           ),
         ),
         const SizedBox(height: 12),
-        TextButton(
-          onPressed: () {
-            // TODO: View analytics
-            Navigator.of(context).popUntil((route) => route.isFirst);
-          },
-          child: const Text('View Analytics'),
+        // Analytics Button
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () {
+              Navigator.of(context).popUntil((route) => route.isFirst);
+              // Navigate to analytics after returning home
+              Future.delayed(const Duration(milliseconds: 100), () {
+                if (context.mounted) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => AnalyticsScreen(
+                        storage: widget.storage,
+                        streakService: widget.streakService,
+                      ),
+                    ),
+                  );
+                }
+              });
+            },
+            icon: const Icon(Icons.analytics_outlined),
+            label: const Text('VIEW ANALYTICS'),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              foregroundColor: const Color(0xFF7C3AED),
+              side: const BorderSide(color: Color(0xFF7C3AED), width: 2),
+            ),
+          ),
         ),
       ],
     );

@@ -1,8 +1,9 @@
 /// App-wide constants
 class AppConstants {
   // App info
-  static const String appName = 'STUDYBUDDY: SMASH MODE';
-  static const String tagline = 'Control your mind. Control your time.';
+  static const String appName = 'StudyBuddy';
+  static const String tagline = 'Your smart study companion';
+
 
   // Timer constants
   static const int defaultFocusDuration = 25; // minutes

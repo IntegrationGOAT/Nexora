@@ -16,6 +16,7 @@ class StorageService {
   static const String _keyLastFailureDate = 'last_failure_date';
   static const String _keyBurnoutMinutes = 'burnout_minutes';
   static const String _keyLastBurnoutCheck = 'last_burnout_check';
+  static const String _keyReminders = 'reminders';
 
   late SharedPreferences _prefs;
 
@@ -227,6 +228,20 @@ class StorageService {
 
   Future<void> resetBurnoutMinutes() async {
     await _prefs.setInt(_keyBurnoutMinutes, 0);
+  }
+
+  // Reminders
+  Future<void> saveReminders(List<Map<String, dynamic>> reminders) async {
+    final List<String> remindersJson = reminders.map((r) => jsonEncode(r)).toList();
+    await _prefs.setStringList(_keyReminders, remindersJson);
+  }
+
+  List<Map<String, dynamic>> getReminders() {
+    final List<String>? remindersJson = _prefs.getStringList(_keyReminders);
+    if (remindersJson == null) {
+      return [];
+    }
+    return remindersJson.map((r) => jsonDecode(r) as Map<String, dynamic>).toList();
   }
 
   // Helper

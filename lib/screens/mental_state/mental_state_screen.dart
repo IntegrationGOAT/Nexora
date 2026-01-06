@@ -26,19 +26,84 @@ class _MentalStateScreenState extends State<MentalStateScreen> {
   int _customDuration = 0;
   final TextEditingController _subjectController = TextEditingController();
   final TextEditingController _topicController = TextEditingController();
+  final TextEditingController _durationController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _selectedState = widget.initialState;
-    _customDuration = _selectedState.defaultSessionMinutes;
+    _customDuration = 25; // Start with empty/default
+    _durationController.text = ''; // Empty text field initially
   }
 
   @override
   void dispose() {
     _subjectController.dispose();
     _topicController.dispose();
+    _durationController.dispose();
     super.dispose();
+  }
+
+  Color _getDurationColor(int minutes) {
+    if (minutes == 0) return Colors.grey; // Not set
+    if (minutes <= 15) return const Color(0xFF10B981); // Green - quick
+    if (minutes <= 30) return const Color(0xFF3B82F6); // Blue - standard
+    if (minutes <= 60) return const Color(0xFF7C3AED); // Purple - solid
+    if (minutes <= 120) return const Color(0xFFEF4444); // Red - intense
+    if (minutes <= 300) return const Color(0xFFFF6B35); // Orange - marathon
+    return const Color(0xFFDC2626); // Dark red - extreme
+  }
+
+  List<Color> _getDurationGradient(int minutes) {
+    if (minutes == 0) return const [Colors.grey, Colors.grey];
+    if (minutes <= 15) return const [Color(0xFF10B981), Color(0xFF059669)];
+    if (minutes <= 30) return const [Color(0xFF3B82F6), Color(0xFF2563EB)];
+    if (minutes <= 60) return const [Color(0xFF7C3AED), Color(0xFF9333EA)];
+    if (minutes <= 120) return const [Color(0xFFEF4444), Color(0xFFDC2626)];
+    if (minutes <= 300) return const [Color(0xFFFF6B35), Color(0xFFF59E0B)];
+    return const [Color(0xFFDC2626), Color(0xFF991B1B)];
+  }
+
+  String _getDurationEmoji(int minutes) {
+    if (minutes == 0) return '⏱️'; // Not set
+    if (minutes <= 15) return '⚡'; // Quick burst
+    if (minutes <= 30) return '🎯'; // Standard focus
+    if (minutes <= 60) return '🔥'; // Solid session
+    if (minutes <= 120) return '💪'; // Power session
+    if (minutes <= 300) return '🚀'; // Marathon mode
+    return '🏆'; // Ultra dedication
+  }
+
+  String _getDurationFeedback(int minutes) {
+    if (minutes == 0) return 'Enter duration';
+    if (minutes <= 15) return 'Quick Sprint';
+    if (minutes <= 30) return 'Perfect Focus';
+    if (minutes <= 60) return 'Solid Session';
+    if (minutes <= 120) return 'Power Mode';
+    if (minutes <= 300) return 'Marathon Session';
+    return 'Ultra Marathon Mode 🔥';
+  }
+
+  String _getDurationWarning(int minutes) {
+    if (minutes <= 60) return '';
+    if (minutes <= 120) return 'Take breaks!';
+    if (minutes <= 300) return '⚠️ Remember to rest!';
+    return '⚠️ EXTREME! Take regular breaks!';
+  }
+
+  double _getSliderProgress(int minutes) {
+    if (minutes == 0) return 0.0; // Not set
+    if (minutes <= 60) {
+      // 1-60 min: 0-60% of bar
+      return ((minutes - 1) / 59 * 0.6).clamp(0.0, 0.6);
+    } else if (minutes <= 300) {
+      // 60-300 min: 60-90% of bar
+      return (0.6 + ((minutes - 60) / 240 * 0.3)).clamp(0.6, 0.9);
+    } else {
+      // 300+ min: 90-98% of bar (capped to never overflow)
+      double progress = 0.9 + ((minutes - 300) / 300 * 0.08);
+      return progress.clamp(0.9, 0.98);
+    }
   }
 
   @override
@@ -46,7 +111,7 @@ class _MentalStateScreenState extends State<MentalStateScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Configure Session'),
-        backgroundColor: Colors.transparent,
+        backgroundColor: _getDurationColor(_customDuration).withOpacity(0.1),
         elevation: 0,
       ),
       body: SafeArea(
@@ -55,9 +120,6 @@ class _MentalStateScreenState extends State<MentalStateScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Mental state display
-              _buildStateDisplay(),
-              const SizedBox(height: 32),
 
               // Duration selector
               _buildDurationSelector(),
@@ -80,53 +142,6 @@ class _MentalStateScreenState extends State<MentalStateScreen> {
     );
   }
 
-  Widget _buildStateDisplay() {
-    return GlassCard(
-      color: _selectedState.primaryColor.withOpacity(0.1),
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          children: [
-            Text(
-              _selectedState.emoji,
-              style: const TextStyle(fontSize: 64),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              _selectedState.displayName,
-              style: Theme.of(context).textTheme.displaySmall,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _getStateDescription(),
-              style: Theme.of(context).textTheme.bodyMedium,
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _getStateDescription() {
-    switch (_selectedState) {
-      case MentalState.distracted:
-        return 'Short, focused bursts to rebuild concentration';
-      case MentalState.overthinking:
-        return 'Structured tasks to clear mental clutter';
-      case MentalState.lazy:
-        return 'Momentum-building sessions with strict accountability';
-      case MentalState.anxious:
-        return 'Calm, manageable blocks with gentle pressure';
-      case MentalState.burnedOut:
-        return 'Recovery-focused, minimal strain sessions';
-      case MentalState.lockedIn:
-        return 'Extended deep work with maximum efficiency';
-      case MentalState.examPanic:
-        return 'High-intensity, exam-focused sprint sessions';
-    }
-  }
-
   Widget _buildDurationSelector() {
     return GlassCard(
       child: Padding(
@@ -138,27 +153,189 @@ class _MentalStateScreenState extends State<MentalStateScreen> {
               'Session Duration',
               style: Theme.of(context).textTheme.headlineMedium,
             ),
-            const SizedBox(height: 16),
-            Slider(
-              value: _customDuration.toDouble(),
-              min: 5,
-              max: 60,
-              divisions: 11,
-              label: '$_customDuration min',
-              activeColor: _selectedState.primaryColor,
-              onChanged: (value) {
-                setState(() {
-                  _customDuration = value.toInt();
-                });
-              },
-            ),
-            Center(
-              child: Text(
-                '$_customDuration minutes',
-                style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                  color: _selectedState.primaryColor,
+            const SizedBox(height: 20),
+
+            // Text input for minutes
+            TextField(
+              controller: _durationController,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: 'Enter minutes (minimum 1)',
+                hintText: 'e.g., 25, 60, 300...',
+                prefixIcon: Icon(
+                  Icons.timer_outlined,
+                  color: _getDurationColor(_customDuration),
+                ),
+                suffixIcon: _customDuration > 0 ? Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Text(
+                    _getDurationEmoji(_customDuration),
+                    style: const TextStyle(fontSize: 24),
+                  ),
+                ) : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide(
+                    color: _getDurationColor(_customDuration).withOpacity(0.3),
+                    width: 2,
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide(
+                    color: _getDurationColor(_customDuration),
+                    width: 2,
+                  ),
                 ),
               ),
+              onChanged: (value) {
+                final minutes = int.tryParse(value);
+                if (minutes != null && minutes >= 1) {
+                  setState(() {
+                    _customDuration = minutes;
+                  });
+                } else if (value.isEmpty) {
+                  setState(() {
+                    _customDuration = 0;
+                  });
+                }
+              },
+            ),
+
+            const SizedBox(height: 16),
+
+            // Emoji feedback and duration type
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: _getDurationGradient(_customDuration),
+                ),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                children: [
+                  Text(
+                    _getDurationEmoji(_customDuration),
+                    style: const TextStyle(fontSize: 48),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _getDurationFeedback(_customDuration),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  if (_getDurationWarning(_customDuration).isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      _getDurationWarning(_customDuration),
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.9),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            // Visual gradient slider (non-interactive, shows duration visually)
+            Column(
+              children: [
+                // Gradient bar
+                Container(
+                  height: 12,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(6),
+                    gradient: LinearGradient(
+                      colors: _getDurationGradient(_customDuration),
+                    ),
+                  ),
+                  child: Stack(
+                    children: [
+                      // Progress indicator - dynamic based on duration with proper capping
+                      FractionallySizedBox(
+                        widthFactor: _getSliderProgress(_customDuration),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(6),
+                            color: Colors.white.withOpacity(0.3),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Duration display with adaptive range labels
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '5m',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    Flexible(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: _getDurationGradient(_customDuration),
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: _getDurationColor(_customDuration).withOpacity(0.4),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _getDurationEmoji(_customDuration),
+                              style: const TextStyle(fontSize: 14),
+                            ),
+                            const SizedBox(width: 6),
+                            Flexible(
+                              child: Text(
+                                _customDuration >= 60
+                                    ? '${(_customDuration / 60).toStringAsFixed(1)}h'
+                                    : '$_customDuration min',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Text(
+                      '∞',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ],
             ),
           ],
         ),

@@ -6,9 +6,9 @@ import '../../core/models/models.dart';
 import '../../core/services/storage_service.dart';
 import '../../core/services/streak_service.dart';
 import '../../core/services/timer_service.dart';
-import '../../core/services/music_service.dart';
 import '../../core/services/haptic_service.dart';
 import '../../core/constants/app_constants.dart';
+import '../../main.dart';
 import '../../widgets/pressure_ring.dart';
 import '../session_complete/session_complete_screen.dart';
 
@@ -35,18 +35,21 @@ class FocusSessionScreen extends StatefulWidget {
 }
 
 class _FocusSessionScreenState extends State<FocusSessionScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
 
   late TimerService _timerService;
-  late MusicService _musicService;
   late DateTime _sessionStartTime;
   late AnimationController _pulseController;
+  late AnimationController _breathingController;
+  late Animation<double> _breathingAnimation;
 
   bool _isLongPressing = false;
   int _longPressProgress = 0;
   Timer? _longPressTimer;
 
-  MusicCategory _currentMusic = MusicCategory.silence;
+  String _motivationalMessage = '';
+  bool _showMotivation = false;
+  Timer? _motivationTimer;
 
   @override
   void initState() {
@@ -57,14 +60,6 @@ class _FocusSessionScreenState extends State<FocusSessionScreen>
   void _initializeSession() {
     _sessionStartTime = DateTime.now();
     _timerService = TimerService();
-    _musicService = MusicService();
-
-    // Initialize music
-    _currentMusic = widget.mentalState.defaultMusicCategory;
-    _musicService.init().then((_) {
-      _musicService.play(_currentMusic);
-      _musicService.fadeIn(durationSeconds: AppConstants.musicFadeInDuration);
-    });
 
     // Start timer
     _timerService.startTimer(
@@ -81,10 +76,73 @@ class _FocusSessionScreenState extends State<FocusSessionScreen>
       ),
     )..repeat(reverse: true);
 
+    // Breathing animation for background with realistic inhale/exhale
+    _breathingController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 5), // 5 seconds full cycle
+    )..repeat();
+
+    // Custom curve for realistic breathing: slower inhale, faster exhale
+    _breathingAnimation = Tween<double>(begin: 0.2, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _breathingController,
+        curve: const Interval(
+          0.0, 1.0,
+          curve: _BreathingCurve(), // Custom breathing curve
+        ),
+      ),
+    );
+
     // Set immersive mode
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
     HapticService.success();
+
+    // Start motivational feedback timer
+    _startMotivationalFeedback();
+  }
+
+  void _startMotivationalFeedback() {
+    // Show first message after 1 minute, then every 1 minute
+    _motivationTimer = Timer.periodic(const Duration(minutes: 1), (timer) {
+      if (mounted) {
+        _showRandomMotivation();
+      }
+    });
+  }
+
+  void _showRandomMotivation() {
+    final messages = [
+      'Keep it up! 🔥',
+      'You\'re doing great! 💪',
+      'Stay focused! 🎯',
+      'Almost there! ⭐',
+      'You got this! 🚀',
+      'Crushing it! 💯',
+      'Keep going! 🌟',
+      'Stay strong! 💪',
+      'Nice work! ✨',
+      'Keep pushing! 🔥',
+      'You\'re unstoppable! ⚡',
+      'Great progress! 📈',
+      'Stay locked in! 🎯',
+      'Amazing effort! 🏆',
+      'Keep the momentum! 🌊',
+    ];
+
+    setState(() {
+      _motivationalMessage = messages[DateTime.now().millisecond % messages.length];
+      _showMotivation = true;
+    });
+
+    // Hide message after 3 seconds
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) {
+        setState(() {
+          _showMotivation = false;
+        });
+      }
+    });
   }
 
   void _onTimerTick() {
@@ -101,9 +159,6 @@ class _FocusSessionScreenState extends State<FocusSessionScreen>
   }
 
   void _completeSession({required bool forced}) async {
-    // Fade out music
-    await _musicService.fadeOut(durationSeconds: AppConstants.musicFadeOutDuration);
-
     // Calculate actual duration
     final actualMinutes = _timerService.elapsedSeconds ~/ 60;
 
@@ -118,7 +173,7 @@ class _FocusSessionScreenState extends State<FocusSessionScreen>
       topic: widget.topic,
       wasHonest: true, // Will be updated in completion screen
       result: forced ? 'forced' : 'completed',
-      musicCategory: _currentMusic.name,
+      musicCategory: null,
       distractionCount: 0,
     );
 
@@ -154,9 +209,10 @@ class _FocusSessionScreenState extends State<FocusSessionScreen>
   @override
   void dispose() {
     _timerService.dispose();
-    _musicService.dispose();
     _pulseController.dispose();
+    _breathingController.dispose();
     _longPressTimer?.cancel();
+    _motivationTimer?.cancel();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
   }
@@ -166,29 +222,46 @@ class _FocusSessionScreenState extends State<FocusSessionScreen>
     return PopScope(
       canPop: false, // Disable back button
       child: Scaffold(
-        backgroundColor: widget.mentalState.primaryColor.withOpacity(0.05),
-        body: Stack(
-          children: [
+        backgroundColor: Colors.transparent,
+        body: AnimatedBuilder(
+          animation: _breathingAnimation,
+          builder: (context, child) {
+            return Container(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: Alignment.center,
+                  radius: 1.5,
+                  colors: [
+                    // Always dark mode: Pure black with breathing effect
+                    widget.mentalState.primaryColor.withOpacity(
+                      _breathingAnimation.value * 0.5 // 0.1 to 0.5 opacity range
+                    ),
+                    const Color(0xFF000000), // Pure black
+                  ],
+                ),
+              ),
+              child: child,
+            );
+          },
+          child: Stack(
+            children: [
             // Main content
             SafeArea(
               child: Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // State emoji
-                    Text(
-                      widget.mentalState.emoji,
-                      style: const TextStyle(fontSize: 48),
-                    ),
-                    const SizedBox(height: 16),
 
-                    // Subject/Topic
+                    // Subject/Topic in black
                     if (widget.subject != null)
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 32),
                         child: Text(
                           widget.subject!,
-                          style: Theme.of(context).textTheme.headlineMedium,
+                          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                            color: Colors.black,
+                            fontWeight: FontWeight.bold,
+                          ),
                           textAlign: TextAlign.center,
                         ),
                       ),
@@ -197,7 +270,9 @@ class _FocusSessionScreenState extends State<FocusSessionScreen>
                         padding: const EdgeInsets.symmetric(horizontal: 32),
                         child: Text(
                           widget.topic!,
-                          style: Theme.of(context).textTheme.bodyMedium,
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Colors.black87,
+                          ),
                           textAlign: TextAlign.center,
                         ),
                       ),
@@ -241,7 +316,10 @@ class _FocusSessionScreenState extends State<FocusSessionScreen>
                                   const SizedBox(height: 8),
                                   Text(
                                     'Stay locked in',
-                                    style: Theme.of(context).textTheme.bodyMedium,
+                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                      color: Colors.black,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                 ],
                               );
@@ -253,8 +331,26 @@ class _FocusSessionScreenState extends State<FocusSessionScreen>
 
                     const SizedBox(height: 48),
 
-                    // Music indicator
-                    _buildMusicIndicator(),
+                    // Motivational message
+                    AnimatedOpacity(
+                      opacity: _showMotivation ? 1.0 : 0.0,
+                      duration: const Duration(milliseconds: 500),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: widget.mentalState.primaryColor.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          _motivationalMessage,
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            color: Colors.black,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -270,33 +366,7 @@ class _FocusSessionScreenState extends State<FocusSessionScreen>
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildMusicIndicator() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      decoration: BoxDecoration(
-        color: widget.mentalState.primaryColor.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.music_note,
-            size: 20,
-            color: widget.mentalState.primaryColor,
-          ),
-          const SizedBox(width: 8),
-          Text(
-            _currentMusic.displayName,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: widget.mentalState.primaryColor,
-            ),
-          ),
-        ],
-      ),
+    ),
     );
   }
 
@@ -408,3 +478,22 @@ class _FocusSessionScreenState extends State<FocusSessionScreen>
   }
 }
 
+/// Custom curve for realistic breathing animation
+/// Simulates inhale (slow ease in) and exhale (faster ease out)
+class _BreathingCurve extends Curve {
+  const _BreathingCurve();
+
+  @override
+  double transformInternal(double t) {
+    // Split into inhale (0.0 to 0.6) and exhale (0.6 to 1.0)
+    if (t < 0.6) {
+      // Inhale: slow and steady (60% of cycle)
+      final inhaleProgress = t / 0.6;
+      return Curves.easeInOut.transform(inhaleProgress);
+    } else {
+      // Exhale: faster and smoother (40% of cycle)
+      final exhaleProgress = (t - 0.6) / 0.4;
+      return 1.0 - Curves.easeIn.transform(exhaleProgress);
+    }
+  }
+}
