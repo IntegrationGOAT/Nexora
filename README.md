@@ -121,6 +121,5 @@ cd nexora
 flutter pub get
 flutter run
 
----
----
+
 
