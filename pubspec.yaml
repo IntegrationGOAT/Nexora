@@ -47,9 +47,6 @@ dependencies:
   # Path provider for local files
   path_provider: ^2.1.2
 
-  # Haptic feedback (built-in Flutter)
-  # Immersive mode
-  flutter_windowmanager: ^0.2.0
 
   # Date formatting
   intl: ^0.18.1
