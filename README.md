@@ -116,7 +116,7 @@ After each session:
 ## 🛠️ Installation
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/IntegrationGOAT/Nexora
 cd nexora
 flutter pub get
 flutter run
